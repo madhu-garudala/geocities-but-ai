@@ -1,0 +1,16 @@
+name = "agentcities"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+[durable_objects]
+bindings = [{ name = "AGENT_DO", class_name = "AgentDO" }]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["AgentDO"]
+
+[[kv_namespaces]]
+binding = "KV"
+id = "4cbdf44f44eb4e88aca9d360bbfc81c6"
+preview_id = "94f6de1a2b6c4acc819085503655e9c8"
