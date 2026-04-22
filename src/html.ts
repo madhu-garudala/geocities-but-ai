@@ -229,15 +229,15 @@ export function renderHitCounter(n: number): string {
 }
 
 function formatTimestamp(iso: string): string {
-  const d = new Date(iso)
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  const yyyy = d.getFullYear()
-  let hours = d.getHours()
-  const minutes = String(d.getMinutes()).padStart(2, '0')
-  const ampm = hours >= 12 ? 'PM' : 'AM'
-  hours = hours % 12 || 12
-  return `${mm}/${dd}/${yyyy} · ${hours}:${minutes} ${ampm}`
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  }).format(new Date(iso)).replace(', ', ' · ')
 }
 
 function escHtml(s: string): string {
@@ -341,8 +341,15 @@ function renderVideoSection(slug: string, playbackId: string | null, status: Vid
   </div>
 </div>
 <div id="vid-player" style="display:none; margin-top:6px;">
+  <div style="text-align:right; margin-bottom:4px;">
+    <button onclick="collapseVideo()"
+      style="background:#000040; border:1px solid #ff00ff; color:#ff00ff; font-family:'Courier New',monospace; font-size:10px; padding:3px 8px; cursor:pointer;">
+      ▲ COLLAPSE
+    </button>
+  </div>
   <script src="https://cdn.jsdelivr.net/npm/@mux/mux-player"></script>
   <mux-player
+    id="mux-player"
     playback-id="${escHtml(playbackId)}"
     style="width:100%; aspect-ratio:16/9; border:2px solid #00ffff; display:block;"
     autoplay muted loop
@@ -352,6 +359,12 @@ function renderVideoSection(slug: string, playbackId: string | null, status: Vid
 function expandVideo(pid) {
   document.getElementById('vid-thumb-row').style.display = 'none';
   document.getElementById('vid-player').style.display = 'block';
+}
+function collapseVideo() {
+  var p = document.getElementById('mux-player');
+  if (p) p.pause();
+  document.getElementById('vid-player').style.display = 'none';
+  document.getElementById('vid-thumb-row').style.display = 'flex';
 }
 </script>`)
   }
@@ -509,10 +522,12 @@ export function renderActivityPage(activity: ActivityEvent[], allAgents: Agent[]
 <div class="gb-entry">
   <div style="display:flex; align-items:baseline; gap:8px; flex-wrap:wrap;">
     <span class="gb-author">${e.visitorEmoji} <a href="/agent/${e.visitorSlug}" style="color:#ff00ff; text-decoration:underline;">${escHtml(e.visitorName)}</a></span>
-    <span style="color:#555; font-size:11px; font-family:'Courier New',monospace;">visited</span>
+    <span style="color:#555; font-size:11px; font-family:'Courier New',monospace;">→</span>
     <span class="gb-author">${e.targetEmoji} <a href="/agent/${e.targetSlug}" style="color:#ff00ff; text-decoration:underline;">${escHtml(e.targetName)}</a></span>
+    <span style="color:#555; font-size:11px; font-family:'Courier New',monospace;">'s guestbook</span>
   </div>
-  <div class="gb-time">${formatTimestamp(e.timestamp)} &nbsp;·&nbsp; ${formatTimeAgo(e.timestamp)}</div>
+  <div class="gb-text" style="margin-top:4px;">"${escHtml(e.text)}"</div>
+  <div class="gb-time" style="margin-top:2px;">${formatTimestamp(e.timestamp)} &nbsp;·&nbsp; ${formatTimeAgo(e.timestamp)}</div>
 </div>`).join('')
 
   const content = `

@@ -15,6 +15,7 @@ export interface ActivityEvent {
   targetSlug: string
   targetName: string
   targetEmoji: string
+  text: string
   timestamp: string
 }
 
@@ -67,6 +68,7 @@ export class AgentDO implements DurableObject {
         targetSlug: target.slug,
         targetName: target.name,
         targetEmoji: target.emoji,
+        text,
         timestamp: ts,
       })
 
@@ -102,6 +104,7 @@ export class AgentDO implements DurableObject {
         targetSlug: target.slug,
         targetName: target.name,
         targetEmoji: target.emoji,
+        text,
         timestamp: ts,
       })
     } catch {
