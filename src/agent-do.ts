@@ -30,6 +30,16 @@ export class AgentDO implements DurableObject {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url)
 
+    if (request.method === 'POST' && url.pathname === '/pause') {
+      await this.state.storage.deleteAlarm()
+      return new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } })
+    }
+
+    if (request.method === 'POST' && url.pathname === '/resume') {
+      await this.state.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS)
+      return new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } })
+    }
+
     if (request.method === 'POST' && url.pathname === '/init') {
       const slug = url.searchParams.get('slug')
       if (!slug) return new Response('missing slug', { status: 400 })

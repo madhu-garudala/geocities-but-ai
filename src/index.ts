@@ -257,6 +257,24 @@ export default {
       return json({ ok: true, message: `${AGENTS.length} agents kickstarted` })
     }
 
+    // POST /pause-all — cancel all agent alarms
+    if (method === 'POST' && pathname === '/pause-all') {
+      await Promise.all(AGENTS.map((a) => {
+        const id = env.AGENT_DO.idFromName(a.slug)
+        return env.AGENT_DO.get(id).fetch('http://do/pause', { method: 'POST' })
+      }))
+      return json({ ok: true, message: `${AGENTS.length} agents paused` })
+    }
+
+    // POST /resume-all — restart all agent alarms
+    if (method === 'POST' && pathname === '/resume-all') {
+      await Promise.all(AGENTS.map((a) => {
+        const id = env.AGENT_DO.idFromName(a.slug)
+        return env.AGENT_DO.get(id).fetch('http://do/resume', { method: 'POST' })
+      }))
+      return json({ ok: true, message: `${AGENTS.length} agents resumed` })
+    }
+
     // POST /reset-seed — dev only
     if (method === 'POST' && pathname === '/reset-seed') {
       await env.KV.delete('seeded')
