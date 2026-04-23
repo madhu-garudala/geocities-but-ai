@@ -31,11 +31,13 @@ export class AgentDO implements DurableObject {
     const url = new URL(request.url)
 
     if (request.method === 'POST' && url.pathname === '/pause') {
+      await this.state.storage.put('paused', true)
       await this.state.storage.deleteAlarm()
       return new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } })
     }
 
     if (request.method === 'POST' && url.pathname === '/resume') {
+      await this.state.storage.delete('paused')
       await this.state.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS)
       return new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } })
     }
@@ -46,8 +48,9 @@ export class AgentDO implements DurableObject {
 
       await this.state.storage.put('slug', slug)
 
+      const paused = await this.state.storage.get<boolean>('paused')
       const existing = await this.state.storage.getAlarm()
-      if (existing === null) {
+      if (!paused && existing === null) {
         await this.state.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS)
       }
       return new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } })
