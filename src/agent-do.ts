@@ -1,4 +1,4 @@
-import { AGENTS, getAgent, getRandom } from './agents'
+import { AGENTS, getAgent } from './agents'
 import { generateGuestbookEntry } from './anthropic'
 import type { GuestbookEntry } from './html'
 
@@ -19,8 +19,6 @@ export interface ActivityEvent {
   timestamp: string
 }
 
-const ALARM_INTERVAL_MS = 5 * 60 * 1000
-
 export class AgentDO implements DurableObject {
   constructor(
     private readonly state: DurableObjectState,
@@ -37,22 +35,15 @@ export class AgentDO implements DurableObject {
     }
 
     if (request.method === 'POST' && url.pathname === '/resume') {
-      await this.state.storage.delete('paused')
-      await this.state.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS)
-      return new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } })
+      // Disabled: autonomous alarms were burning through the KV free tier.
+      return new Response(JSON.stringify({ ok: false, reason: 'alarms disabled' }), { status: 410, headers: { 'content-type': 'application/json' } })
     }
 
     if (request.method === 'POST' && url.pathname === '/init') {
       const slug = url.searchParams.get('slug')
       if (!slug) return new Response('missing slug', { status: 400 })
-
       await this.state.storage.put('slug', slug)
-
-      const paused = await this.state.storage.get<boolean>('paused')
-      const existing = await this.state.storage.getAlarm()
-      if (!paused && existing === null) {
-        await this.state.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS)
-      }
+      // Intentionally no setAlarm — see alarm() below.
       return new Response(JSON.stringify({ ok: true }), { headers: { 'content-type': 'application/json' } })
     }
 
@@ -92,39 +83,10 @@ export class AgentDO implements DurableObject {
   }
 
   async alarm(): Promise<void> {
-    const mySlug = await this.state.storage.get<string>('slug')
-    if (!mySlug) return
-
-    const me = getAgent(mySlug)
-    if (!me) return
-
-    const target = getRandom(mySlug)
-    const ts = new Date().toISOString()
-
-    try {
-      const text = await generateGuestbookEntry(me, target, this.env.ANTHROPIC_API_KEY)
-      await appendGuestbookEntry(this.env.KV, target.slug, {
-        authorSlug: me.slug,
-        authorName: me.name,
-        authorEmoji: me.emoji,
-        text,
-        timestamp: ts,
-      })
-      await appendActivity(this.env.KV, {
-        visitorSlug: me.slug,
-        visitorName: me.name,
-        visitorEmoji: me.emoji,
-        targetSlug: target.slug,
-        targetName: target.name,
-        targetEmoji: target.emoji,
-        text,
-        timestamp: ts,
-      })
-    } catch {
-      // swallow errors — alarm must reschedule regardless
-    }
-
-    await this.state.storage.setAlarm(Date.now() + ALARM_INTERVAL_MS)
+    // Kill switch: any pending alarm fires once, does no KV work, and does not
+    // reschedule. This drains the alarm queue across all DOs after deploy.
+    await this.state.storage.put('paused', true)
+    await this.state.storage.deleteAlarm()
   }
 }
 
