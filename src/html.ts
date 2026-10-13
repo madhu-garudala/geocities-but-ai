@@ -411,9 +411,15 @@ function generateVideo(slug) {
   var btn = document.getElementById('gen-btn');
   btn.disabled = true;
   btn.textContent = '⏳ SUBMITTING...';
-  fetch('/agent/' + slug + '/generate-video', { method: 'POST' })
-    .then(function(r) { return r.json(); })
+  var token = '';
+  try { token = localStorage.getItem('adminToken') || ''; } catch (e) {}
+  fetch('/agent/' + slug + '/generate-video', { method: 'POST', headers: { 'x-admin-token': token } })
+    .then(function(r) {
+      if (r.status === 401) { btn.textContent = '🔒 ADMIN ONLY'; return null; }
+      return r.json();
+    })
     .then(function(d) {
+      if (!d) return;
       if (d.ok) {
         btn.textContent = '⏳ GENERATING...';
         ${pollScript(slug, true)}

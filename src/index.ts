@@ -21,6 +21,26 @@ export interface Env {
   MUX_TOKEN_ID: string
   MUX_TOKEN_SECRET: string
   FAL_KEY: string
+  ADMIN_TOKEN: string
+}
+
+// Every POST route either spends money (Anthropic, fal.ai) or mutates state,
+// so they all require the ADMIN_TOKEN secret. Fails closed if it is unset.
+async function isAdmin(request: Request, env: Env): Promise<boolean> {
+  if (!env.ADMIN_TOKEN) return false
+  const auth = request.headers.get('authorization') ?? ''
+  const provided = auth.startsWith('Bearer ') ? auth.slice(7) : request.headers.get('x-admin-token') ?? ''
+  if (!provided) return false
+  const enc = new TextEncoder()
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest('SHA-256', enc.encode(provided)),
+    crypto.subtle.digest('SHA-256', enc.encode(env.ADMIN_TOKEN)),
+  ])
+  const x = new Uint8Array(a)
+  const y = new Uint8Array(b)
+  let diff = 0
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i]
+  return diff === 0
 }
 
 function html(body: string, status = 200): Response {
@@ -54,6 +74,10 @@ export default {
     const url = new URL(request.url)
     const { pathname } = url
     const method = request.method
+
+    if (method !== 'GET' && method !== 'HEAD' && !(await isAdmin(request, env))) {
+      return json({ ok: false, error: 'unauthorized' }, 401)
+    }
 
     // GET / or /agents — homepage
     if (method === 'GET' && (pathname === '/' || pathname === '/agents')) {
@@ -266,13 +290,9 @@ export default {
       return json({ ok: true, message: `${AGENTS.length} agents paused` })
     }
 
-    // POST /resume-all — restart all agent alarms
+    // POST /resume-all — alarms are disabled in AgentDO, so this cannot resume anything
     if (method === 'POST' && pathname === '/resume-all') {
-      await Promise.all(AGENTS.map((a) => {
-        const id = env.AGENT_DO.idFromName(a.slug)
-        return env.AGENT_DO.get(id).fetch('http://do/resume', { method: 'POST' })
-      }))
-      return json({ ok: true, message: `${AGENTS.length} agents resumed` })
+      return json({ ok: false, error: 'alarms disabled' }, 410)
     }
 
     // POST /reset-seed — dev only
